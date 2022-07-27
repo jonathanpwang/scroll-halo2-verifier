@@ -1,14 +1,13 @@
-use halo2_proofs::arithmetic::BaseExt;
 use halo2_proofs::plonk::keygen_vk;
 use halo2_proofs::plonk::VerifyingKey;
 use halo2_proofs::plonk::{create_proof, keygen_pk};
-use halo2_proofs::transcript::PoseidonRead;
-use halo2_proofs::transcript::{Challenge255, PoseidonWrite};
+use halo2_proofs::transcript::Challenge255;
 use halo2_proofs::{
     arithmetic::{CurveAffine, MultiMillerLoop},
     plonk::Circuit,
     poly::commitment::Params,
 };
+use halo2_snark_aggregator_api::transcript::sha::{ShaRead, ShaWrite};
 use rand_core::OsRng;
 use std::io::Write;
 
@@ -60,7 +59,8 @@ pub fn sample_circuit_random_run<
     circuit: CIRCUIT::Circuit,
     instances: &[&[C::Scalar]],
     index: usize,
-) {
+) -> (Params<C>, VerifyingKey<C>, Vec<u8>) {
+    /*
     let params = {
         folder.push(format!("sample_circuit_{}.params", CIRCUIT::NAME));
         let mut fd = std::fs::File::open(folder.as_path()).unwrap();
@@ -74,13 +74,31 @@ pub fn sample_circuit_random_run<
         folder.pop();
         VerifyingKey::<C>::read::<_, CIRCUIT::Circuit>(&mut fd, &params).unwrap()
     };
+    */
 
+    let params = Params::<C>::unsafe_setup::<E>(CIRCUIT::TARGET_CIRCUIT_K);
+
+    println!("generating vk...");
+    let default_circuit = CIRCUIT::Circuit::default();
+    let vk = keygen_vk(&params, &default_circuit).expect("keygen_vk should not fail");
+
+    println!("generating pk...");
     let pk = keygen_pk(&params, vk, &circuit).expect("keygen_pk should not fail");
 
+    {
+        folder.push(format!("sample_circuit_{}.params", CIRCUIT::NAME));
+        let mut fd = std::fs::File::create(folder.as_path()).unwrap();
+        folder.pop();
+        params.write(&mut fd).unwrap();
+    }
+
+    println!("done with vk & pk");
     // let instances: &[&[&[C::Scalar]]] = &[&[&[constant * a.square() * b.square()]]];
-    let instances: &[&[&[_]]] = &[instances];
-    let mut transcript = PoseidonWrite::<_, _, Challenge255<_>>::init(vec![]);
-    create_proof(&params, &pk, &[circuit], instances, OsRng, &mut transcript)
+    // let instances: &[&[&[_]]] = &[instances];
+    // no public inputs for now
+    let mut transcript = ShaWrite::<_, _, Challenge255<_>, sha2::Sha256>::init(vec![]);
+    println!("creating proof...");
+    create_proof(&params, &pk, &[circuit], &[], OsRng, &mut transcript)
         .expect("proof generation should not fail");
     let proof = transcript.finalize();
 
@@ -95,6 +113,7 @@ pub fn sample_circuit_random_run<
         fd.write_all(&proof).unwrap();
     }
 
+    /*
     {
         folder.push(format!(
             "sample_circuit_instance_{}{}.data",
@@ -111,22 +130,29 @@ pub fn sample_circuit_random_run<
             })
         });
     }
+    */
 
+    /*
     let vk = {
         folder.push(format!("sample_circuit_{}.vkey", CIRCUIT::NAME));
         let mut fd = std::fs::File::open(folder.as_path()).unwrap();
         folder.pop();
         VerifyingKey::<C>::read::<_, CIRCUIT::Circuit>(&mut fd, &params).unwrap()
     };
-    let params = params.verifier::<E>(CIRCUIT::PUBLIC_INPUT_SIZE).unwrap();
-    let strategy = halo2_proofs::plonk::SingleVerifier::new(&params);
-    let mut transcript = PoseidonRead::<_, _, Challenge255<_>>::init(&proof[..]);
+    */
+    let params_verifier = params.verifier::<E>(CIRCUIT::PUBLIC_INPUT_SIZE).unwrap();
+    let strategy = halo2_proofs::plonk::SingleVerifier::new(&params_verifier);
+    let mut transcript = ShaRead::<_, _, Challenge255<_>, sha2::Sha256>::init(&proof[..]);
     halo2_proofs::plonk::verify_proof::<E, _, _, _>(
-        &params,
-        &vk,
+        &params_verifier,
+        &pk.get_vk(),
         strategy,
-        instances,
+        &[],
         &mut transcript,
     )
     .unwrap();
+    println!("proof was verified");
+
+    let vk = keygen_vk(&params, &default_circuit).expect("keygen_vk should not fail");
+    (params, vk, proof)
 }

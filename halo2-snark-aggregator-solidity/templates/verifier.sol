@@ -323,20 +323,6 @@ contract Verifier {
         n.y[1] = uint256({{verify_circuit_n_g2_y1}});
     }
 
-    function get_target_circuit_g2_s() internal pure returns (G2Point memory s) {
-        s.x[0] = uint256({{target_circuit_s_g2_x0}});
-        s.x[1] = uint256({{target_circuit_s_g2_x1}});
-        s.y[0] = uint256({{target_circuit_s_g2_y0}});
-        s.y[1] = uint256({{target_circuit_s_g2_y1}});
-    }
-
-    function get_target_circuit_g2_n() internal pure returns (G2Point memory n) {
-        n.x[0] = uint256({{target_circuit_n_g2_x0}});
-        n.x[1] = uint256({{target_circuit_n_g2_x1}});
-        n.y[0] = uint256({{target_circuit_n_g2_y0}});
-        n.y[1] = uint256({{target_circuit_n_g2_y1}});
-    }
-
     function get_wx_wg(uint256[] calldata proof, uint256[{{instance_size}}] memory instances)
         internal
         view
@@ -354,14 +340,9 @@ contract Verifier {
     }
 
     function verify(
-        uint256[] calldata proof,
-        uint256[] calldata target_circuit_final_pair
+        uint256[] calldata proof
     ) public view {
         uint256[{{instance_size}}] memory instances;
-        instances[0] = target_circuit_final_pair[0] & ((1 << 136) - 1);
-        instances[1] = (target_circuit_final_pair[0] >> 136) + ((target_circuit_final_pair[1] & 1) << 136);
-        instances[2] = target_circuit_final_pair[2] & ((1 << 136) - 1);
-        instances[3] = (target_circuit_final_pair[2] >> 136) + ((target_circuit_final_pair[3] & 1) << 136);
         {% for statement in instance_assign %}
         {{statement}}
         {%- endfor %}
@@ -386,14 +367,5 @@ contract Verifier {
         checked = pairing(g1_points, g2_points);
         require(checked);
 
-        g1_points[0].x = target_circuit_final_pair[0];
-        g1_points[0].y = target_circuit_final_pair[1];
-        g1_points[1].x = target_circuit_final_pair[2];
-        g1_points[1].y = target_circuit_final_pair[3];
-        g2_points[0] = get_target_circuit_g2_s();
-        g2_points[1] = get_target_circuit_g2_n();
-
-        checked = pairing(g1_points, g2_points);
-        require(checked);
     }
 }

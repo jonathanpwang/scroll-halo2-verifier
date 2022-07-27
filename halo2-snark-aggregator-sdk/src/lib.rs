@@ -26,7 +26,7 @@ macro_rules! zkaggregate {
             use pairing_bn256::bn256::{Bn256, Fr, G1Affine};
             use std::io::{Cursor, Read, Write};
             use std::marker::PhantomData;
-            use std::path::PathBuf;
+            use std::path::{Path,PathBuf};
             use std::rc::Rc;
             use paste::paste;
 
@@ -36,12 +36,6 @@ macro_rules! zkaggregate {
                 // TODO: replace it with subcommand
                 #[clap(short, long)]
                 command: String,
-                #[clap(short, long)]
-                nproofs: usize,
-                #[clap(short, long, parse(from_os_str))]
-                folder_path: std::path::PathBuf,
-                #[clap(short, long, parse(from_os_str))]
-                template_path: Option<std::path::PathBuf>,
             }
 
             paste! {
@@ -66,8 +60,8 @@ macro_rules! zkaggregate {
                     env_init();
 
                     let args = Cli::parse();
-                    let folder = args.folder_path.clone();
-                    let template_folder = args.template_path.clone();
+                    let folder = Path::new("output").to_path_buf();
+                    let template_folder = Some(Path::new("templates").to_path_buf());
 
                     CliBuilder {
                         args,
@@ -92,25 +86,23 @@ macro_rules! zkaggregate {
                     )*
                 }
 
-                fn sample_run_one_circuit<SingleCircuit: TargetCircuit<G1Affine, Bn256>>(&self) {
-                    for i in 0..SingleCircuit::N_PROOFS {
-                        let (circuit, instances) = SingleCircuit::instance_builder();
+                fn sample_run_one_circuit<SingleCircuit: TargetCircuit<G1Affine, Bn256>>(&self) -> (Params<G1Affine>, VerifyingKey<G1Affine>, Vec<u8>) {
+                    let (circuit, instances) = SingleCircuit::instance_builder();
 
-                        sample_circuit_random_run::<G1Affine, Bn256, SingleCircuit>(
-                            self.folder.clone(),
-                            circuit,
-                            &instances
-                                .iter()
-                                .map(|instance| &instance[..])
-                                .collect::<Vec<_>>()[..],
-                            i,
-                        );
-                    }
+                    sample_circuit_random_run::<G1Affine, Bn256, SingleCircuit>(
+                        self.folder.clone(),
+                        circuit,
+                        &instances
+                            .iter()
+                            .map(|instance| &instance[..])
+                            .collect::<Vec<_>>()[..],
+                        0,
+                    )
                 }
 
-                fn dispatch_sample_run(&self) {
+                fn dispatch_sample_run(&self) -> (Params<G1Affine>, VerifyingKey<G1Affine>, Vec<u8>) {
                     $(
-                        self.sample_run_one_circuit::<$x>();
+                        self.sample_run_one_circuit::<$x>()
                     )*
                 }
 
@@ -160,21 +152,17 @@ macro_rules! zkaggregate {
                     // multiple circuits is not supported yet.
                     assert_eq!($n, 1);
 
-                    let target_circuits_params: [SolidityGenerate<_>; $n] = [
-                        $(
-                            SolidityGenerate::new::<$x>(&self.folder),
-                        )*
-                    ];
-
+                    let (params, vk, proof) = self.dispatch_sample_run();
                     let request = MultiCircuitSolidityGenerate::<G1Affine, $n> {
-                        target_circuits_params,
-                        verify_params: &load_verify_circuit_params(&mut self.folder.clone()),
-                        verify_vk: &load_verify_circuit_vk(&mut self.folder.clone()),
-                        verify_circuit_instance: load_verify_circuit_instance(
+                        // target_circuits_params,
+                        verify_params: &params,
+                        verify_vk: &vk,
+                        // all private inputs for now
+                        /* verify_circuit_instance: load_verify_circuit_instance(
                             &mut self.folder.clone(),
-                        ),
-                        proof: load_verify_circuit_proof(&mut self.folder.clone()),
-                        verify_public_inputs_size: self.compute_verify_public_input_size(),
+                        ), */
+                        proof,
+                        verify_public_inputs_size: 0, // self.compute_verify_public_input_size(),
                     };
 
                     let sol = request.call::<Bn256>(self.template_folder.clone().unwrap());

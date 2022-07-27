@@ -354,10 +354,10 @@ impl<
     pub fn build_params(mut self) -> Result<VerifierParams<A>, A::Error> {
         self.init_transcript()?;
 
-        self.squeeze_instance_commitment()?;
-        let instance_commitments = &self.assigned_instances;
+        //self.squeeze_instance_commitment()?;
+        //let instance_commitments = &self.assigned_instances;
 
-        let num_proofs = instance_commitments.len();
+        let num_proofs = 0; //instance_commitments.len();
 
         let advice_commitments = self.load_n_m_points(num_proofs, self.vk.cs.num_advice_columns)?;
 
@@ -403,6 +403,8 @@ impl<
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        println!("done a bunch of stuff that should be empty");
+
         let random_commitment = self.load_point()?;
 
         let y = self.squeeze_challenge_scalar()?;
@@ -421,6 +423,7 @@ impl<
         let random_eval = self.load_scalar()?;
 
         let permutation_evals = self.load_n_scalars(self.vk.permutation.commitments.len())?;
+        println!("got permutaiton_evals");
         let permutation_evaluated = self.build_permutation_evaluated(
             &x,
             permutations_committed,
@@ -428,8 +431,10 @@ impl<
             &instance_evals,
             &fixed_evals,
         )?;
+        println!("done build_permutation_evaluated");
 
         let lookup_evaluated = self.build_lookup_evaluated(lookups_permuted, lookups_committed)?;
+        println!("done build_lookup_evaluated");
 
         let fixed_commitments = self
             .vk
@@ -437,6 +442,7 @@ impl<
             .iter()
             .map(|&affine| self.pchip.assign_const(self.ctx, affine))
             .collect::<Result<Vec<_>, _>>()?;
+        println!("done fixed_commitments");
 
         let v = self.squeeze_challenge_scalar()?;
         let u = self.squeeze_challenge_scalar()?;
@@ -649,7 +655,10 @@ pub fn verify_single_proof_no_eval<
         key,
     };
 
+    println!("try to build params");
     let chip_params = params_builder.build_params()?;
+    println!("done building params");
+    println!("try to batch multi open proofs");
     chip_params.batch_multi_open_proofs(ctx, schip)
 }
 

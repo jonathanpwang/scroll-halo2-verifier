@@ -323,7 +323,7 @@ contract Verifier {
         n.y[1] = uint256({{verify_circuit_n_g2_y1}});
     }
 
-    function get_wx_wg(uint256[] calldata proof, uint256[{{instance_size}}] memory instances)
+    function get_wx_wg(uint256[] calldata proof/*, uint256[{{instance_size}}] memory instances*/)
         internal
         view
         returns (uint256, uint256, uint256, uint256)
@@ -342,10 +342,12 @@ contract Verifier {
     function verify(
         uint256[] calldata proof
     ) public view {
+        /*
         uint256[{{instance_size}}] memory instances;
         {% for statement in instance_assign %}
         {{statement}}
         {%- endfor %}
+        */
 
         uint256 x0 = 0;
         uint256 x1 = 0;
@@ -356,7 +358,7 @@ contract Verifier {
         G2Point[] memory g2_points = new G2Point[](2);
         bool checked = false;
 
-        (x0, y0, x1, y1) = get_wx_wg(proof, instances);
+        (x0, y0, x1, y1) = get_wx_wg(proof/*, instances*/);
         g1_points[0].x = x0;
         g1_points[0].y = y0;
         g1_points[1].x = x1;

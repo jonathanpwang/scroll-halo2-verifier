@@ -1,64 +1,23 @@
-# halo2-snark-aggregator
-halo2 verify circuit for plonk and halo2 verify schemes.
+# scroll-halo2-verifier
 
-## Base Trait
-This repo is supposed to be used as a convenient tool for the following purpose:
-* Generating verifying code, circuit and contract by providing different implementation of a few unified traits for a single verify implementation. 
-* Constructing prove aggregators that can aggregate multi halo2 proofs.
-* Generating contract for the verification of the proof of the aggregator.
+## Instructions for generating solidity code of a single "sample circuit"
 
-## Simple use case
+Currently everything only works with no public inputs (so there is no instance column) in your circuit.
 
-* Generate single verify circuit for a precompiled circuit:
+We remove the aggregation layer from Scroll's halo2 verifier. To setup:
 
-```
-        let mut transcript = PoseidonRead::<_, G1Affine, Challenge255<G1Affine>>::init(&proof[..]);
-
-        let params = VerifierParams::from_transcript(
-            base_gate,
-            ecc_gate,
-            r,
-            u,
-            &[&[&[instance]]],
-            pk.get_vk() as &VerifyingKey<G1Affine>,
-            &params_verifier,
-            &mut transcript,
-        )?;
-
-        let guard = params.batch_multi_open_proofs(r, base_gate, ecc_gate)?;
-
-        let (left_s, left_e) = guard.w_x.eval(base_gate, ecc_gate, r)?;
-        let (right_s, right_e) = guard.w_g.eval(base_gate, ecc_gate, r)?;
-```
-
-* Generate single verify code for a precompiled circuit:
+- Add this repo to `Cargo.toml` for relevant packages
+- Copy [this example](halo2-snark-aggregator-sdk/examples/simple-example.rs) to `main.rs` in the main repo with your halo2 circuits.
+- Modify everything before [this line](halo2-snark-aggregator-sdk/examples/simple-example.rs#L328) to configure the circuit you want to test.
+- Implement `Default` trait for `MyCircuit` so key generation does what you expect.
+- Configure `TestCircuit` appropriately.
+- Copy `templates` folder from [here](https://github.com/jonathanpwang/scroll-halo2-verifier/tree/main/halo2-snark-aggregator-solidity/templates) to the current root directory.
+- We use the SDK to generate solidity code of the sample circuit: use command
 
 ```
-        let mut transcript = PoseidonRead::<_, G1Affine, Challenge255<G1Affine>>::init(&proof[..]);
-        let sgate = FieldCode::<Fp>::default();
-        let pgate = PointCode::<G1Affine>::default();
-        let params = VerifierParams::from_transcript(
-            sgate,
-            pgate,
-            r,
-            u,
-            &[&[&[instance]]],
-            pk.get_vk() as &VerifyingKey<G1Affine>,
-            &params_verifier,
-            &mut transcript,
-        )?;
-
-        let guard = params.batch_multi_open_proofs(r, base_gate, ecc_gate)?;
-
-        let (left_s, left_e) = guard.w_x.eval(base_gate, ecc_gate, r)?;
-        let (right_s, right_e) = guard.w_g.eval(base_gate, ecc_gate, r)?;
+cargo run --release -- --command verify_solidity
 ```
 
-## Proof Aggregator:
-Suppose we have a bunch of proof of circuit C.
-1. Generate multiple proofs P(1) of C under poseidon hash config.
-1. Applying this tool to generate verify circuit VC of C under poseidon hash config and get multiopen proofs by
-    * w_x_i, w_g_i = VC.batch_multi_open_proofs(...)
-    * batch w_x_i and w_g_i to get w_x and w_g
-3. Prove VC under sha256 hash config and get its proof P.
-4. Apply this tool to generate verify contract of VC and get the final contract that can verify the final aggregated proof P.
+- To estimate gas cost, etc, see [readme](halo2-snark-aggregator-solidity/README.md).
+
+(The other commands in SDK are not guaranteed to work due to read/write issues and because we stripped out aggregation layer.)

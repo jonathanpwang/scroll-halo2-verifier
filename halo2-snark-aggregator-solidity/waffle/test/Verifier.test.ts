@@ -43,27 +43,25 @@ describe("Verifier", () => {
 
   beforeEach(async () => {
     token = await deployContract(wallet, Verifier, [], { gasLimit: 6700000 });
-/*
+    /*
     token.on("Scalar", (x) => {
       console.log("Scalar", x.toString());
     })
 */
   });
 
-  let proof = fs.readFileSync(
-    "../../halo2-snark-aggregator-sdk/output/verify_circuit_proof.data"
-  );
-  let final_pair = fs.readFileSync(
+  let proof = fs.readFileSync("circuit_proof.data");
+  /*let final_pair = fs.readFileSync(
     "../../halo2-snark-aggregator-sdk/output/verify_circuit_final_pair.data"
-  );
+  );*/
   console.log("proof length", proof.length);
 
-  console.log(bufferToUint256LE(final_pair));
+  /*console.log(bufferToUint256LE(final_pair));*/
 
   it("Assigns initial balance", async () => {
     let a = await token.estimateGas.verify(
-      bufferToUint256LE(proof),
-      bufferToUint256LE(final_pair),
+      bufferToUint256LE(proof) //,
+      //bufferToUint256LE(final_pair),
     );
     console.log(a.toString());
   });
